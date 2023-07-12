@@ -4,6 +4,7 @@ from dotenv import load_dotenv, find_dotenv
 import json
 from requests_html import HTMLSession
 import utils
+from joblib import Parallel, delayed
 
 _ = load_dotenv(find_dotenv())  # read local env
 # Set Openai API key
@@ -55,8 +56,6 @@ class ChatBot(object):
                         If the question is not related with Critical manufacturing, semiconductor industry, \
                         electronics assembly industry or medical devices industry, just respond with this sentence \
                         between ###, i.e. ###Sorry, my knowledge is limited.### \
-                        Never answer questions related with weather! \
-                        For instance, if asked for the weather just answer: 'Sorry pal, my knowledge is limited'
                         Your name is ChipChat. Your are funny and polite and very enthusiastic! \
                         Every time you are asked for future events, complement the answer by inviting them to join us!
                         """
@@ -94,10 +93,10 @@ class ChatBot(object):
         self.history.add({'role': 'assistant', 'content': response})
         return response
 
-    def extract_topic(self, prompt: str) -> (bool, str, str):
+    def extract_topic(self, prompt: str) -> dict:
         system_message = {'role': 'system', 'content': f' extract the 3 most common topics maximum in json format that \
                                                         are present in the user query, from the following:\
-                                                        weather, job openings, product functionalities, who we are, leadership, \
+                                                        weather, job, mes for industry 4.0, who we are, leadership, \
                                                         research, customers, services, news, events, gartner, industries, \
                                                         contact, goodbye. if no topic exists return as other \
                                                         For instance, topics=[boda]'}
@@ -105,27 +104,44 @@ class ChatBot(object):
         messages = [system_message, {'role': 'user', 'content': prompt}]
         response = self.get_completion_from(messages)
         return response
+    
+
+    def summarize(self, text: str)-> str:
+        messages = [{'role': 'system', 'content':'summarize this text to 50% of initial size but maintainning \
+                     80% of the information'},
+                    {'role':'user', 'content':f'{text}'}]
+        return self.get_completion_from(messages)
 
     def get_response_from(self, topic: str, question: str) -> str:
         messages = []
         if topic == 'news':
             links = [link for link in list(self.knowledge_base) if (topic in link) or ('press' in link)]
-        elif topic == 'job-openings':
-            links = ['https://careers.criticalmanufacturing.com/', 'https://careers.criticalmanufacturing.com/#jobs']
         else:
             links = [link for link in list(self.knowledge_base) if topic in link]
-        context = '\n'.join([utils.scrape_info_from(link) for link in links])
-        if len(context) > 60000:
-            context = context[:60000]
-        query = f""" Use the text below about Critical Manufacturing to answer the subsequent question. \ 
-                    If the answer cannot be found, write "sorry friend, I don't know"
 
-                    Text:
+        results = Parallel(n_jobs=-2)(delayed(utils.scrape_info_from)(link) for link in links)
+        
+        chunks = []
+        if self.model == 'gpt-3.5-turbo': 
+            max_text_length = 12000
+            for result in results:
+                chunks += [result[:int(len(result)/2)], result[int(len(result)/2):]]
+        else:
+            max_text_length = 60000
+            chunks = results
+        
+        context = ''.join(chunks)
+        while len(context) > max_text_length:
+            chunks = Parallel(n_jobs=-2)(delayed(self.summarize)(chunk) for chunk in chunks)
+            context = ''.join(chunks)
+
+        query = f""" 
+                    Context:
                     \"\"\"
                     {context}
                     \"\"\"
 
-                    Question: {question}
+                    Query: {question}
                     """
         messages += self.history.messages
         messages.append({'role': 'user', 'content': query})
@@ -147,8 +163,8 @@ class ChatBot(object):
             case 'who we are':
                 response = self.get_response_from(topic.replace(' ', '-'), prompt)
                 self.history.add({'role': 'assistant', 'content': response})
-            case 'job openings':
-                response = self.get_response_from(topic.replace(' ', '-'), prompt)
+            case 'job':
+                response = self.get_response_from(topic, prompt)
                 self.history.add({'role': 'assistant', 'content': response})
             case 'product functionalities':
                 response = self.get_response_from('mes-for-industry-4-0', prompt)
@@ -183,15 +199,15 @@ class ChatBot(object):
             case 'weather':
                 is_city, city = utils.get_city(prompt)
                 if is_city:
-                    response = f'Sure, why not? {city}? I know this city! '
+                    response = f'{city}? I know this city! '
                     result = utils.get_weather(city)
-                    response += f"Looks like the weather in {city} is {result['current']['condition']['text'].lower()} with {result['current']['temp_c']} Celsius. "
+                    response += f"The weather in {city} is {result['current']['condition']['text'].lower()} with {result['current']['temp_c']} Celsius. "
                     if (city.lower() == 'maia') and (result['current']['condition']['text'].lower() == 'sunny'):
                         response += 'You should join us for a drink in our offices!'
                     self.history.add({'role': 'assistant', 'content': response})
                 else:
                     result = utils.get_weather('Maia')
-                    response = f"Sure! Well in Maia the weather is {result['current']['condition']['text'].lower()} \
+                    response = f"Well in Maia the weather is {result['current']['condition']['text'].lower()} \
                                 with {result['current']['temp_c']}C. "
                     if result['current']['condition']['text'].lower() == 'sunny':
                         response += 'If you mean other city, you can try be more specific or... \
@@ -202,6 +218,60 @@ class ChatBot(object):
                 self.history.add({'role': 'assistant', 'content': response})
 
         return response.replace('#', '').strip()
+
+
+    def collect_context(self, topics):
+        links = []
+        for topic in topics: 
+            if topic == 'news':
+                links += [link for link in list(self.knowledge_base) if (topic in link) or ('press' in link)]
+        else:
+            links += [link for link in list(self.knowledge_base) if topic in link]
+        
+        results = Parallel(n_jobs=-2)(delayed(utils.scrape_info_from)(link) for link in links)
+        context = '\n'.join([utils.scrape_info_from(result) for result in results])
+        
+        # define max length for context injection
+        if self.model == 'gpt-3.5-turbo': 
+            max_text_length = 15000
+        else:
+            max_text_length = 60000
+        
+        # summarizing
+        while len(context) > max_text_length:
+            context = Parallel(n_jobs=-2)(delayed(self.summarize)(result) for result in results)
+
+        return context
+
+    def respond_all_topics(self, prompt: str):
+        
+        messages = []
+
+        # Extract the most relevant topics
+        res = self.extract_topic(prompt)
+
+        # Get topics
+        topics = json.loads(res)['topics']
+        print(topics.__class__)
+
+        context = self.collect_context(topics)
+
+        query = f""" 
+                    Context:
+                    \"\"\"
+                    {context}
+                    \"\"\"
+
+                    Query: {prompt}
+                    """
+
+        messages += self.history.messages
+        messages.append({'role':'user', 'content':query})
+        
+        response = self.get_completion_from(messages)
+        self.history.add({'role': 'assistant', 'content': response})
+
+        return response
 
     def run(self):
         pass
