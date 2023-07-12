@@ -9,8 +9,9 @@ def scrape_info_from(url: str) -> str:
     Scrape information from url provided
     returns: string
     """
-    s = HTMLSession().get(url)
-    divp = s.html.find('h2,h3,h4,h5,h6,p,a,span')
+    s = HTMLSession()
+    r = s.get(url)
+    divp = r.html.find('h2,h3,h4,h5,h6,p,a,span')
     return '\n'.join([d.text for d in divp])
 
 
