@@ -4,3 +4,5 @@ streamlit-chat
 streamlit-extras
 openai
 requests-html
+joblib
+PySide2
