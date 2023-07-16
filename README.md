@@ -1,2 +1,2 @@
 # commercial-chatbot
-shatbot oriented for sales as business developer
+Chatbot MVP oriented for sales as business developer
