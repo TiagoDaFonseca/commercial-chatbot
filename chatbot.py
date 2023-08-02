@@ -6,9 +6,9 @@ from requests_html import HTMLSession
 import utils
 from joblib import Parallel, delayed
 
-_ = load_dotenv(find_dotenv())  # read local env
+#_ = load_dotenv(find_dotenv())  # read local env
 # Set Openai API key
-openai.api_key = os.environ['OPENAI_API_KEY']
+#openai.api_key = os.environ['OPENAI_API_KEY']
 
 
 class MessageBuffer:
