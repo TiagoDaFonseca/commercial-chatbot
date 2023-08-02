@@ -2,7 +2,7 @@ from requests_html import HTMLSession
 import openai
 import json
 import requests
-
+import os
 
 def scrape_info_from(url: str) -> str:
     """
@@ -45,7 +45,7 @@ def get_weather(city) -> dict:
     """
     url = f'https://weather-api-by-any-city.p.rapidapi.com/weather/{city}'
     headers = {
-        "X-RapidAPI-Key": "3cc9b2533dmshe5f859e07cf719ap12b21ajsne7a51c643f12",
+        "X-RapidAPI-Key": os.environ('WEATHER_API_KEY'),
         "X-RapidAPI-Host": "weather-api-by-any-city.p.rapidapi.com"
     }
     response = requests.get(url, headers=headers).json()
