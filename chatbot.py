@@ -91,7 +91,7 @@ class ChatBot(object):
     def extract_topic(self, prompt: str) -> dict:
         system_message = {'role': 'system', 'content': f' extract the 3 most common topics maximum in json format that \
                                                         are present in the user query, from the following:\
-                                                        weather, job, mes for industry 4.0, who we are, leadership, \
+                                                        weather, job, mes for industry 4.0, company info, leadership, \
                                                         research, customers, services, news, events, gartner, industries, \
                                                         contact, goodbye. if no topic exists return as other \
                                                         For instance, topics=[boda]'}
@@ -154,63 +154,62 @@ class ChatBot(object):
             topic = 'other'
 
         # find appropriate info for each topic
-        match topic:
-            case 'who we are':
-                response = self.get_response_from(topic.replace(' ', '-'), prompt)
-                self.history.add({'role': 'assistant', 'content': response})
-            case 'job':
+        if topic == 'company info':
+            response = self.get_response_from('who-we-are', prompt)
+            self.history.add({'role': 'assistant', 'content': response})
+        elif topic == 'job':
+            response = self.get_response_from(topic, prompt)
+            self.history.add({'role': 'assistant', 'content': response})
+        elif topic == 'product functionalities':
+            response = self.get_response_from('mes-for-industry-4-0', prompt)
+            self.history.add({'role': 'assistant', 'content': response})
+        elif 'leadership':
+            response = self.get_response_from(topic, prompt)
+            self.history.add({'role': 'assistant', 'content': response})
+        elif 'research':
+            response = self.get_response_from(topic, prompt)
+            self.history.add({'role': 'assistant', 'content': response})
+        elif topic == 'customers':
+            response = self.get_response_from(topic, prompt)
+            self.history.add({'role': 'assistant', 'content': response})
+        elif topic =='services':
+            response = self.get_response_from(topic, prompt)
+            self.history.add({'role': 'assistant', 'content': response})
+        elif topic == 'news':
+            response = self.get_response_from(topic, prompt)
+            self.history.add({'role': 'assistant', 'content': response})
+        elif topic == 'events':
                 response = self.get_response_from(topic, prompt)
                 self.history.add({'role': 'assistant', 'content': response})
-            case 'product functionalities':
-                response = self.get_response_from('mes-for-industry-4-0', prompt)
-                self.history.add({'role': 'assistant', 'content': response})
-            case 'leadership':
+        elif topic == 'gartner':
                 response = self.get_response_from(topic, prompt)
                 self.history.add({'role': 'assistant', 'content': response})
-            case 'research':
+        elif topic == 'industries':
+            response = self.get_response_from(topic, prompt)
+            self.history.add({'role': 'assistant', 'content': response})
+        elif topic == 'contact':
                 response = self.get_response_from(topic, prompt)
                 self.history.add({'role': 'assistant', 'content': response})
-            case 'customers':
-                response = self.get_response_from(topic, prompt)
+        elif 'weather':
+            is_city, city = utils.get_city(prompt)
+            if is_city:
+                response = f'{city}? I know this city! '
+                result = utils.get_weather(city)
+                response += f"The weather in {city} is {result['current']['condition']['text'].lower()} with {result['current']['temp_c']} Celsius. "
+                if (city.lower() == 'maia') and (result['current']['condition']['text'].lower() == 'sunny'):
+                    response += 'You should join us for a drink in our offices!'
                 self.history.add({'role': 'assistant', 'content': response})
-            case 'services':
-                response = self.get_response_from(topic, prompt)
+            else:
+                result = utils.get_weather('Maia')
+                response = f"Well in Maia the weather is {result['current']['condition']['text'].lower()} \
+                            with {result['current']['temp_c']}C. "
+                if result['current']['condition']['text'].lower() == 'sunny':
+                    response += 'If you mean other city, you can try be more specific or... \
+                                you could join us for a drink in our offices!'
                 self.history.add({'role': 'assistant', 'content': response})
-            case 'news':
-                response = self.get_response_from(topic, prompt)
-                self.history.add({'role': 'assistant', 'content': response})
-            case 'events':
-                response = self.get_response_from(topic, prompt)
-                self.history.add({'role': 'assistant', 'content': response})
-            case 'gartner':
-                response = self.get_response_from(topic, prompt)
-                self.history.add({'role': 'assistant', 'content': response})
-            case 'industries':
-                response = self.get_response_from(topic, prompt)
-                self.history.add({'role': 'assistant', 'content': response})
-            case 'contact':
-                response = self.get_response_from(topic, prompt)
-                self.history.add({'role': 'assistant', 'content': response})
-            case 'weather':
-                is_city, city = utils.get_city(prompt)
-                if is_city:
-                    response = f'{city}? I know this city! '
-                    result = utils.get_weather(city)
-                    response += f"The weather in {city} is {result['current']['condition']['text'].lower()} with {result['current']['temp_c']} Celsius. "
-                    if (city.lower() == 'maia') and (result['current']['condition']['text'].lower() == 'sunny'):
-                        response += 'You should join us for a drink in our offices!'
-                    self.history.add({'role': 'assistant', 'content': response})
-                else:
-                    result = utils.get_weather('Maia')
-                    response = f"Well in Maia the weather is {result['current']['condition']['text'].lower()} \
-                                with {result['current']['temp_c']}C. "
-                    if result['current']['condition']['text'].lower() == 'sunny':
-                        response += 'If you mean other city, you can try be more specific or... \
-                                    you could join us for a drink in our offices!'
-                    self.history.add({'role': 'assistant', 'content': response})
-            case _:
-                response = self.get_completion_from(self.history.messages)
-                self.history.add({'role': 'assistant', 'content': response})
+        else:
+            response = self.get_completion_from(self.history.messages)
+            self.history.add({'role': 'assistant', 'content': response})
 
         return response.replace('#', '').strip()
 
