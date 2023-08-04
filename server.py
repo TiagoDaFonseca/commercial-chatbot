@@ -20,7 +20,7 @@ def server():
     colored_header('', description='Chat', color_name='blue-70')
 
     st.sidebar.header('Settings')
-    api_key = st.sidebar.text_input('Insert here your openai access token')
+    api_key = st.sidebar.text_input('Insert here your openai access token', type="password")
     if api_key is not None:
         openai.api_key = api_key
 
